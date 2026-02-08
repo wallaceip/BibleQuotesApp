@@ -7,11 +7,9 @@ import {
   Dimensions,
   FlatList,
   LayoutChangeEvent,
-  Modal,
   Platform,
   RefreshControl,
   SafeAreaView,
-  ScrollView,
   Share,
   StatusBar,
   StyleSheet,
@@ -20,93 +18,15 @@ import {
   TouchableWithoutFeedback,
   View
 } from 'react-native';
-import Animated, {
-  cancelAnimation,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSequence,
-  withSpring,
-  withTiming
-} from 'react-native-reanimated';
 
-import { TagChip } from '../../components/tag-chip';
+import { AnimatedSmallHeart, BigHeartOverlay } from '../../components/animated-heart';
+import { HeaderControls } from '../../components/header-controls';
+import { ShuffleToast } from '../../components/shuffle-toast';
+import { TagFilterModal } from '../../components/tag-filter-modal';
 import { QUOTES_DATA, TAGS, TAG_TRANSLATIONS } from '../../constants/quotes';
 
 const initialWidth = Dimensions.get('window').width;
 const initialHeight = Dimensions.get('window').height;
-
-const AnimatedSmallHeart = ({ isLiked, forceBounce, darkMode }: { isLiked: boolean, forceBounce: number, darkMode: boolean }) => {
-  const scale = useSharedValue(1);
-  useEffect(() => {
-    if (isLiked) {
-      cancelAnimation(scale);
-      scale.value = withSequence(withSpring(1.3, { damping: 10, stiffness: 200 }), withSpring(1));
-    } else {
-      scale.value = withTiming(1, { duration: 100 });
-    }
-  }, [isLiked, forceBounce]);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const iconColor = isLiked ? "#ff4d4d" : (darkMode ? "#fff" : "#000"); // High contrast
-  return (
-    <Animated.View style={animatedStyle}>
-      <Ionicons name={isLiked ? "heart" : "heart-outline"} size={32} color={iconColor} />
-    </Animated.View>
-  );
-};
-
-const BigHeartOverlay = ({ visibleKey, onFinish }: { visibleKey: number, onFinish: () => void }) => {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(0);
-  useEffect(() => {
-    if (visibleKey > 0) {
-      scale.value = 0;
-      opacity.value = 0.5;
-      scale.value = withSpring(1.2, { damping: 15, stiffness: 300 });
-      opacity.value = withDelay(250, withTiming(0, { duration: 250 }, (finished) => { if (finished) runOnJS(onFinish)(); }));
-    }
-  }, [visibleKey]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: opacity.value }));
-  if (visibleKey === 0) return null;
-  return (
-    <View style={styles.heartOverlay}>
-      <Animated.View style={style}>
-        <Ionicons name="heart" size={100} color="#ff4d4d" />
-      </Animated.View>
-    </View>
-  );
-};
-
-// Toast Notification Component
-const ShuffleToast = ({ visible, message, darkMode }: { visible: boolean, message: string, darkMode: boolean }) => {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(-20);
-
-  useEffect(() => {
-    if (visible) {
-      opacity.value = withTiming(1, { duration: 300 });
-      translateY.value = withSpring(0);
-    } else {
-      opacity.value = withTiming(0, { duration: 300 });
-      translateY.value = withTiming(-20);
-    }
-  }, [visible]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }]
-  }));
-
-  if (!visible && opacity.value === 0) return null;
-
-  return (
-    <Animated.View style={[styles.toastContainer, animatedStyle, { backgroundColor: darkMode ? 'rgba(50,50,50,0.95)' : 'rgba(255,255,255,0.95)' }]}>
-      <Ionicons name="shuffle" size={18} color={darkMode ? "#fff" : "#000"} style={{ marginRight: 8 }} />
-      <Text style={[styles.toastText, { color: darkMode ? "#fff" : "#000" }]}>{message}</Text>
-    </Animated.View>
-  );
-};
 
 export default function HomeScreen() {
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -443,31 +363,14 @@ export default function HomeScreen() {
       <ShuffleToast visible={toastVisible} message={language === 'zh' ? "列表已刷新" : "List Shuffled"} darkMode={darkMode} />
 
       {/* Header */}
-      <View style={styles.headerContainer}>
-        {/* Transparent Header for Controls */}
-        <View style={styles.headerControls}>
-          <TouchableOpacity onPress={toggleLanguage}>
-            <View style={[styles.headerButton, darkMode ? styles.btnDark : styles.btnLight]}>
-              <Text style={{ color: darkMode ? "#fff" : "#000", fontSize: 13, fontWeight: '700' }}>
-                {language === 'en' ? '中' : 'EN'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={toggleTheme}>
-            <View style={[styles.headerButton, darkMode ? styles.btnDark : styles.btnLight]}>
-              <Ionicons name={darkMode ? "sunny" : "moon"} size={20} color={darkMode ? "#fff" : "#000"} />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setModalVisible(true)}>
-            <View style={[styles.headerButton, darkMode ? styles.btnDark : styles.btnLight, selectedTags.length > 0 && styles.activeFilterButton]}>
-              <Ionicons name="pricetag" size={20} color={selectedTags.length > 0 ? "#fff" : (darkMode ? "#fff" : "#000")} />
-            </View>
-            {selectedTags.length > 0 && <View style={styles.filterBadge} />}
-          </TouchableOpacity>
-        </View>
-      </View>
+      <HeaderControls
+        language={language}
+        darkMode={darkMode}
+        selectedTagsCount={selectedTags.length}
+        onToggleLanguage={toggleLanguage}
+        onToggleTheme={toggleTheme}
+        onOpenFilter={() => setModalVisible(true)}
+      />
 
       <BigHeartOverlay visibleKey={bigHeartTrigger} onFinish={() => { }} />
 
@@ -516,67 +419,18 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* TAG FILTER MODAL - Standard Native Look */}
-      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
-          <View style={[styles.modalContent, darkMode ? styles.modalDark : styles.modalLight]}>
-            <View style={styles.modalHandle} />
-
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: darkMode ? '#fff' : '#000' }]}>
-                {language === 'zh' ? '標籤篩選' : 'Filter by Tags'}
-              </Text>
-              {selectedTags.length > 0 && (
-                <TouchableOpacity onPress={clearFilters}>
-                  <Text style={{ color: '#007AFF', fontSize: 14 }}>
-                    {language === 'zh' ? '清除' : 'Clear'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <ScrollView style={styles.tagsScrollView} showsVerticalScrollIndicator={false}>
-              {/* Favorites Tag */}
-              <Text style={[styles.sectionLabel, { color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }]}>
-                {language === 'zh' ? '收藏' : 'Collection'}
-              </Text>
-              <View style={styles.tagsContainer}>
-                <TagChip
-                  tag={language === 'zh' ? '#收藏' : '#favorites'}
-                  selected={selectedTags.includes('#favorites')}
-                  onPress={() => handleTagToggle('#favorites')}
-                  darkMode={darkMode}
-                />
-              </View>
-
-              {/* All Tags */}
-              <Text style={[styles.sectionLabel, { color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)', marginTop: 20 }]}>
-                {language === 'zh' ? '所有標籤' : 'All Tags'}
-              </Text>
-              <View style={styles.tagsContainer}>
-                {TAGS.map((tag) => (
-                  <TagChip
-                    key={tag}
-                    tag={getDisplayTag(tag)}
-                    selected={selectedTags.includes(tag)}
-                    onPress={() => handleTagToggle(tag)}
-                    darkMode={darkMode}
-                  />
-                ))}
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity
-              style={[styles.doneButton, { backgroundColor: darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }]}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={{ color: darkMode ? '#fff' : '#000', fontWeight: '600', fontSize: 16 }}>
-                {language === 'zh' ? '完成' : 'Done'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {/* Tag Filter Modal */}
+      <TagFilterModal
+        visible={modalVisible}
+        darkMode={darkMode}
+        language={language}
+        selectedTags={selectedTags}
+        allTags={TAGS}
+        getDisplayTag={getDisplayTag}
+        onTagToggle={handleTagToggle}
+        onClearFilters={clearFilters}
+        onClose={() => setModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
