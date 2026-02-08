@@ -34,12 +34,12 @@ export function TagChip({ tag, selected = false, onPress, darkMode = true, style
 
 const styles = StyleSheet.create({
     container: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
         borderWidth: 1,
-        marginRight: 8,
-        marginBottom: 8,
+        marginRight: 10,
+        marginBottom: 10,
     },
     containerDark: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
         borderColor: '#007AFF',
     },
     text: {
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '500',
     },
     textDark: {
