@@ -1,18 +1,17 @@
-import React, { useState, useCallback } from 'react';
-import {
-    StyleSheet,
-    Text,
-    View,
-    SafeAreaView,
-    ScrollView,
-    TouchableOpacity
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
-// Import Data
-import { QUOTES_DATA } from '../../constants/quotes';
+import { QUOTES_DATA, TAG_TRANSLATIONS } from '../../constants/quotes';
 
 export default function FavoritesScreen() {
     const [favorites, setFavorites] = useState<string[]>([]);
@@ -47,16 +46,23 @@ export default function FavoritesScreen() {
 
     const favoriteQuotes = QUOTES_DATA.filter(q => favorites.includes(q.id));
 
+    const getDisplayTag = (tag: string) => {
+        if (language === 'zh' && TAG_TRANSLATIONS[tag]) {
+            return TAG_TRANSLATIONS[tag];
+        }
+        return tag;
+    };
+
     const theme = {
         bg: darkMode ? '#000' : '#f2f2f7',
-        card: darkMode ? '#1c1c1e' : '#fff',
         text: darkMode ? '#fff' : '#000',
-        subText: darkMode ? '#888' : '#666',
+        subText: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
     };
 
     const labels = {
         title: language === 'zh' ? "收藏" : "Favorites",
-        noFavorites: language === 'zh' ? "尚無收藏" : "No favorites yet.",
+        noFavorites: language === 'zh' ? "尚無收藏" : "No favorites yet",
+        hint: language === 'zh' ? "雙擊金句來收藏" : "Double-tap a quote to add it here",
     };
 
     return (
@@ -66,25 +72,37 @@ export default function FavoritesScreen() {
                     <Text style={[styles.title, { color: theme.text }]}>{labels.title}</Text>
                 </View>
 
-                <ScrollView contentContainerStyle={{ padding: 20 }}>
+                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
                     {favorites.length === 0 ? (
-                        <View style={[styles.emptyContainer, { borderColor: theme.subText }]}>
-                            <Ionicons name="heart-dislike-outline" size={60} color={theme.subText} />
-                            <Text style={{ color: theme.subText, marginTop: 20, fontSize: 18 }}>{labels.noFavorites}</Text>
+                        <View style={[styles.emptyContainer, darkMode ? styles.cardDark : styles.cardLight]}>
+                            <Ionicons name="heart-outline" size={60} color={theme.subText} />
+                            <Text style={{ color: theme.subText, marginTop: 20, fontSize: 18, fontWeight: '500' }}>{labels.noFavorites}</Text>
+                            <Text style={{ color: theme.subText, marginTop: 8, fontSize: 14, textAlign: 'center' }}>{labels.hint}</Text>
                         </View>
                     ) : (
                         favoriteQuotes.map((item) => (
-                            <View key={item.id} style={[styles.favCard, { backgroundColor: theme.card }]}>
+                            <View key={item.id} style={[styles.favCard, darkMode ? styles.cardDark : styles.cardLight]}>
                                 <Text style={[styles.favText, { color: theme.text }]}>
-                                    "{language === 'zh' ? item.text_zh : item.text}"
+                                    {language === 'zh' ? item.text_zh : item.text}
                                 </Text>
+
+                                {/* Tags Row */}
+                                <View style={styles.tagsRow}>
+                                    {item.tags.slice(0, 3).map((tag: string) => (
+                                        <View key={tag} style={[styles.tagPill, darkMode ? styles.tagPillDark : styles.tagPillLight]}>
+                                            <Text style={[styles.tagText, { color: theme.subText }]}>
+                                                {getDisplayTag(tag)}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
 
                                 <View style={styles.favFooter}>
                                     <Text style={[styles.favVerse, { color: theme.subText }]}>
                                         {language === 'zh' ? item.verse_zh : item.verse}
                                     </Text>
 
-                                    <TouchableOpacity onPress={() => removeFavorite(item.id)} style={{ padding: 5 }}>
+                                    <TouchableOpacity onPress={() => removeFavorite(item.id)} style={styles.removeButton}>
                                         <Ionicons name="heart" size={26} color="#ff4d4d" />
                                     </TouchableOpacity>
                                 </View>
@@ -101,11 +119,55 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10 },
     title: { fontSize: 34, fontWeight: 'bold' },
-    emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100, borderStyle: 'dashed', borderWidth: 1, borderRadius: 20, padding: 40 },
 
-    // Favorites Styles
-    favCard: { padding: 20, borderRadius: 16, marginBottom: 15 },
-    favText: { fontSize: 18, fontWeight: '600', marginBottom: 15, lineHeight: 26 },
-    favFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 },
-    favVerse: { fontSize: 14, fontStyle: 'italic' },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 60,
+        padding: 40,
+        borderRadius: 20,
+    },
+
+    // Favorites Card Styles
+    favCard: {
+        padding: 24,
+        borderRadius: 20,
+        marginBottom: 16,
+    },
+    cardDark: {
+        backgroundColor: '#1c1c1e',
+    },
+    cardLight: {
+        backgroundColor: '#fff',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    favText: { fontSize: 18, fontWeight: '600', marginBottom: 16, lineHeight: 26 },
+
+    tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+    tagPill: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        borderWidth: 1,
+    },
+    tagPillDark: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'transparent',
+    },
+    tagPillLight: {
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        borderColor: 'transparent',
+    },
+    tagText: { fontSize: 11, fontWeight: '500' },
+
+    favFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    favVerse: { fontSize: 14, fontStyle: 'italic', flex: 1 },
+    removeButton: {
+        padding: 8,
+        marginLeft: 12,
+    },
 });

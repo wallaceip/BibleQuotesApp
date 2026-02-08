@@ -1,7 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -12,11 +12,20 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: isDark ? '#000' : '#fff',
-          borderTopColor: isDark ? '#333' : '#e5e5ea',
+          backgroundColor: isDark ? '#1c1c1e' : '#ffffff', // Solid background
+          borderTopWidth: 1,
+          borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+          height: Platform.OS === 'ios' ? 88 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          paddingTop: 10,
         },
-        tabBarActiveTintColor: isDark ? '#fff' : '#000',
-        tabBarInactiveTintColor: '#888',
+        tabBarActiveTintColor: '#007AFF', // iOS Active Blue
+        tabBarInactiveTintColor: isDark ? '#8e8e93' : '#8e8e93', // iOS Gray
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '500',
+          marginTop: 4,
+        },
       }}>
 
       {/* Home Tab */}
@@ -47,7 +56,7 @@ export default function TabLayout() {
         options={{
           title: 'Options',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'options' : 'options-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
           ),
         }}
       />
