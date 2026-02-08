@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
+import * as Speech from 'expo-speech';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
@@ -8,6 +9,7 @@ import {
   LayoutChangeEvent,
   Modal,
   Platform,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   Share,
@@ -76,16 +78,52 @@ const BigHeartOverlay = ({ visibleKey, onFinish }: { visibleKey: number, onFinis
   );
 };
 
+// Toast Notification Component
+const ShuffleToast = ({ visible, message, darkMode }: { visible: boolean, message: string, darkMode: boolean }) => {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(-20);
+
+  useEffect(() => {
+    if (visible) {
+      opacity.value = withTiming(1, { duration: 300 });
+      translateY.value = withSpring(0);
+    } else {
+      opacity.value = withTiming(0, { duration: 300 });
+      translateY.value = withTiming(-20);
+    }
+  }, [visible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }]
+  }));
+
+  if (!visible && opacity.value === 0) return null;
+
+  return (
+    <Animated.View style={[styles.toastContainer, animatedStyle, { backgroundColor: darkMode ? 'rgba(50,50,50,0.95)' : 'rgba(255,255,255,0.95)' }]}>
+      <Ionicons name="shuffle" size={18} color={darkMode ? "#fff" : "#000"} style={{ marginRight: 8 }} />
+      <Text style={[styles.toastText, { color: darkMode ? "#fff" : "#000" }]}>{message}</Text>
+    </Animated.View>
+  );
+};
+
 export default function HomeScreen() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [language, setLanguage] = useState('en');
+  const [refreshing, setRefreshing] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
 
   const [bigHeartTrigger, setBigHeartTrigger] = useState(0);
   const [smallHeartTriggers, setSmallHeartTriggers] = useState<{ [key: string]: number }>({});
   const [layout, setLayout] = useState({ width: initialWidth, height: initialHeight });
+
+  const [displayData, setDisplayData] = useState<any[]>([]);
+  const currentIndexRef = useRef(0);
+  const listRef = useRef<FlatList>(null);
 
   const FILTER_OPTIONS = ['#favorites', ...TAGS];
 
@@ -126,45 +164,6 @@ export default function HomeScreen() {
     await AsyncStorage.setItem('favorites', JSON.stringify(newFavs));
   };
 
-  const handleIconPress = (id: string) => {
-    if (favorites.includes(id)) {
-      updateFavorites(favorites.filter(favId => favId !== id));
-    } else {
-      setSmallHeartTriggers(prev => ({ ...prev, [id]: Date.now() }));
-      updateFavorites([...favorites, id]);
-    }
-  };
-
-  const handleDoubleTap = (id: string) => {
-    setBigHeartTrigger(prev => prev + 1);
-    if (favorites.includes(id)) {
-      updateFavorites(favorites.filter(favId => favId !== id));
-    } else {
-      setSmallHeartTriggers(prev => ({ ...prev, [id]: Date.now() }));
-      updateFavorites([...favorites, id]);
-    }
-  };
-
-  const onShare = async (text: string, verse: string) => {
-    await Share.share({ message: `"${text}" - ${verse}` });
-  };
-
-  const handleTagToggle = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter(t => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
-    }
-  };
-
-  const clearFilters = () => {
-    setSelectedTags([]);
-  };
-
-  const [isShuffle, setIsShuffle] = useState(false);
-  const [displayData, setDisplayData] = useState<any[]>([]);
-  const currentIndexRef = useRef(0);
-
   // Shuffle Helper
   const getShuffled = useCallback((arr: any[]) => {
     const newArr = [...arr];
@@ -190,63 +189,133 @@ export default function HomeScreen() {
     return data;
   }, [selectedTags, favorites]);
 
-  // Init/Reset Feed - Only on Filter Change
+  // Init/Reset Feed - Always Shuffle
   useEffect(() => {
-    currentIndexRef.current = 0;
-    if (isShuffle) {
+    // If resetting due to tag change, ensure we check if we should keep current quote
+    // Logic moved to handleTagToggle/handleSingleTagSelect to avoid harsh reset
+    // This effect acts as initial load or full reset
+    if (displayData.length === 0) {
+      currentIndexRef.current = 0;
       setDisplayData(getShuffled(filteredSource));
-    } else {
-      setDisplayData(filteredSource);
     }
-  }, [filteredSource]); // Dependency reduced to avoid reset on shuffle toggle
+  }, [filteredSource, getShuffled]); // Only runs if source changes significantly AND data is empty?
+  // We need to be careful. If tags change, filteredSource changes.
+  // We want to handle that manually in tag selection to preserve quote.
+  // But if favorites change (outside of tag selection), maybe we update source.
+  // Let's rely on manual updates for tag changes and use effect for initial/radical changes?
+  // Actually, we can just let this effect run if filteredSource changes, BUT we check if we can preserve?
+  // React effects are hard to intercept.
+  // Better approach: Remove filteredSource as dependency for auto-wipe.
+  // Instead, have a separate effect that checks if current displayed quotes are still valid?
+  // Or: Just manually set displayData when tags change.
 
-  // Toggle Shuffle with History Preservation
-  const toggleShuffle = () => {
-    const newMode = !isShuffle;
-    setIsShuffle(newMode);
+  // Manual Tag Selection Handler - Preserves Current Quote
+  const applyFilterWithPreservation = (newTags: string[], showToastFlag: boolean = true) => {
+    // 1. Get new source
+    let newSource = QUOTES_DATA;
+    if (newTags.length > 0) {
+      newSource = QUOTES_DATA.filter(item => {
+        const isFav = newTags.includes('#favorites') && favorites.includes(item.id);
+        const isTag = item.tags.some(t => newTags.includes(t));
+        return isFav || isTag;
+      });
+    }
 
-    if (displayData.length > 0) {
-      const currentIdx = currentIndexRef.current;
-      // Keep everything up to current visible item
-      const history = displayData.slice(0, currentIdx + 1);
+    // 2. Identify current quote
+    let currentQuote = null;
+    if (displayData.length > 0 && currentIndexRef.current < displayData.length) {
+      currentQuote = displayData[currentIndexRef.current];
+    }
 
-      let nextItems = [];
-      if (newMode) {
-        nextItems = getShuffled(filteredSource);
-        // Ensure no immediate repeat
-        if (nextItems.length > 0 && history.length > 0 && nextItems[0].id === history[history.length - 1].id) {
-          if (nextItems.length > 1) {
-            // Swap first with random other
-            const swapIdx = Math.floor(Math.random() * (nextItems.length - 1)) + 1;
-            [nextItems[0], nextItems[swapIdx]] = [nextItems[swapIdx], nextItems[0]];
-          }
-        }
-      } else {
-        nextItems = filteredSource;
-      }
-      setDisplayData([...history, ...nextItems]);
+    // 3. Generate new feed
+    let newFeed = getShuffled(newSource);
+
+    // 4. If current quote is still valid in new source, put it first
+    const shouldPreserve = currentQuote && newSource.some(item => item.id === currentQuote.id);
+    if (shouldPreserve) {
+      // Remove current quote from newFeed to avoid duplicate at start
+      newFeed = newFeed.filter(item => item.id !== currentQuote.id);
+      // Prepend current quote
+      newFeed = [currentQuote, ...newFeed];
+      currentIndexRef.current = 0;
+    } else {
+      currentIndexRef.current = 0;
+    }
+
+    // Update state first, then scroll after React renders
+    setDisplayData(newFeed);
+    setSelectedTags(newTags);
+
+    // Defer scroll to after state update completes
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
+
+    // Show Toast only if requested
+    if (showToastFlag) {
+      showToast();
     }
   };
+
+  const showToast = () => {
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 2000);
+  };
+
+  const handleTagToggle = (tag: string) => {
+    let newTags: string[];
+    if (selectedTags.includes(tag)) {
+      newTags = selectedTags.filter(t => t !== tag);
+    } else {
+      newTags = [...selectedTags, tag];
+    }
+    applyFilterWithPreservation(newTags, false); // No toast
+  };
+
+  const handleSingleTagSelect = (tag: string) => {
+    // Just toggle the tag selection for visual highlighting
+    // Don't reshuffle the data - keep current quote stable
+    if (selectedTags.includes(tag) && selectedTags.length === 1) {
+      setSelectedTags([]); // Toggle off
+    } else {
+      setSelectedTags([tag]);
+    }
+    // Note: Filtering happens via filteredSource memo, but we don't reshuffle displayData here
+  };
+
+  const clearFilters = () => {
+    applyFilterWithPreservation([], false); // No toast
+  };
+
+  // Pull to Refresh
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => {
+      // Shuffle EVERYTHING including current quote
+      const newFeed = getShuffled(filteredSource);
+      setDisplayData(newFeed);
+      currentIndexRef.current = 0;
+      showToast();
+      setRefreshing(false);
+    }, 600);
+  }, [filteredSource, getShuffled]);
 
   const loadMore = () => {
     if (filteredSource.length === 0) return;
 
-    let moreData;
-    if (isShuffle) {
-      moreData = getShuffled(filteredSource);
-      // Smart Shuffle: Prevent back-to-back duplicates at the seam
-      if (displayData.length > 0 && moreData.length > 0) {
-        const lastItem = displayData[displayData.length - 1];
-        if (moreData[0].id === lastItem.id) {
-          // Swap first item of new batch with something else
-          if (moreData.length > 1) {
-            const swapIdx = Math.floor(Math.random() * (moreData.length - 1)) + 1;
-            [moreData[0], moreData[swapIdx]] = [moreData[swapIdx], moreData[0]];
-          }
+    // Always use Smart Shuffle
+    const moreData = getShuffled(filteredSource);
+
+    // Smart Shuffle: Prevent back-to-back duplicates at the seam
+    if (displayData.length > 0 && moreData.length > 0) {
+      const lastItem = displayData[displayData.length - 1];
+      if (moreData[0].id === lastItem.id) {
+        // Swap first item of new batch with something else
+        if (moreData.length > 1) {
+          const swapIdx = Math.floor(Math.random() * (moreData.length - 1)) + 1;
+          [moreData[0], moreData[swapIdx]] = [moreData[swapIdx], moreData[0]];
         }
       }
-    } else {
-      moreData = filteredSource;
     }
 
     setDisplayData(prev => [...prev, ...moreData]);
@@ -266,13 +335,27 @@ export default function HomeScreen() {
     return tag;
   };
 
-  // Single Tag Selection (for pill click)
-  const handleSingleTagSelect = (tag: string) => {
-    if (selectedTags.includes(tag) && selectedTags.length === 1) {
-      setSelectedTags([]); // Toggle off if it's the only one
+  const handleIconPress = (id: string) => {
+    if (favorites.includes(id)) {
+      updateFavorites(favorites.filter(favId => favId !== id));
     } else {
-      setSelectedTags([tag]);
+      setSmallHeartTriggers(prev => ({ ...prev, [id]: Date.now() }));
+      updateFavorites([...favorites, id]);
     }
+  };
+
+  const handleDoubleTap = (id: string) => {
+    if (favorites.includes(id)) {
+      updateFavorites(favorites.filter(favId => favId !== id));
+    } else {
+      setBigHeartTrigger(prev => prev + 1); // Only trigger animation on LIKE
+      setSmallHeartTriggers(prev => ({ ...prev, [id]: Date.now() }));
+      updateFavorites([...favorites, id]);
+    }
+  };
+
+  const onShare = async (text: string, verse: string) => {
+    await Share.share({ message: `"${text}" - ${verse}` });
   };
 
   const renderItem = ({ item }: { item: any }) => {
@@ -297,9 +380,6 @@ export default function HomeScreen() {
         <View style={[styles.pageContainer, { backgroundColor: darkMode ? '#000' : '#f0f0f5', width: layout.width, height: layout.height }]}>
 
           <View style={styles.centerContent}>
-            {/* Top Spacer to balance Bottom Actions for true centering */}
-            <View style={{ height: 200 }} />
-
             {/* Quote Card */}
             <View style={[styles.quoteCard, darkMode ? styles.cardDark : styles.cardLight]}>
               <Text style={[styles.quoteText, { color: darkMode ? '#fff' : '#000' }]}>{displayText}</Text>
@@ -311,9 +391,17 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={tag}
                     onPress={() => handleSingleTagSelect(tag)}
-                    style={[styles.tagPill, darkMode ? styles.tagPillDark : styles.tagPillLight]}
+                    style={[
+                      styles.tagPill,
+                      darkMode ? styles.tagPillDark : styles.tagPillLight,
+                      selectedTags.includes(tag) && { backgroundColor: '#007AFF', borderColor: '#007AFF' }
+                    ]}
                   >
-                    <Text style={[styles.tagText, { color: darkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }]}>
+                    <Text style={[
+                      styles.tagText,
+                      { color: darkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' },
+                      selectedTags.includes(tag) && { color: '#fff' }
+                    ]}>
                       {getDisplayTag(tag)}
                     </Text>
                   </TouchableOpacity>
@@ -321,15 +409,20 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Bottom Actions - Clean & High Contrast */}
             {/* Bottom Actions - Clean Icons */}
             <View style={styles.bottomActions}>
               <TouchableOpacity onPress={() => onShare(displayText, displayVerse)} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
                 <Ionicons name="share-outline" size={32} color={darkMode ? "#fff" : "#000"} />
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={toggleShuffle} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
-                <Ionicons name={isShuffle ? "shuffle" : "shuffle-outline"} size={32} color={isShuffle ? "#007AFF" : (darkMode ? "#fff" : "#000")} style={{ opacity: isShuffle ? 1 : 0.6 }} />
+              <TouchableOpacity
+                onPress={() => Speech.speak(`${displayText}. ${displayVerse}`, {
+                  language: language === 'zh' ? 'zh-HK' : 'en-US',
+                  rate: 0.9
+                })}
+                hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+              >
+                <Ionicons name="volume-high-outline" size={32} color={darkMode ? "#fff" : "#000"} />
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => handleIconPress(item.id)} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
@@ -343,11 +436,15 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: darkMode ? '#000' : '#f0f0f5' }]} onLayout={onLayout}>
+    <SafeAreaView style={[styles.container, { backgroundColor: darkMode ? '#000' : '#f0f0f5' }]}>
       <StatusBar barStyle={darkMode ? "light-content" : "dark-content"} />
 
-      {/* Header Controls - No Glass */}
-      <SafeAreaView style={styles.headerContainer}>
+      {/* Toast Notification */}
+      <ShuffleToast visible={toastVisible} message={language === 'zh' ? "列表已刷新" : "List Shuffled"} darkMode={darkMode} />
+
+      {/* Header */}
+      <View style={styles.headerContainer}>
+        {/* Transparent Header for Controls */}
         <View style={styles.headerControls}>
           <TouchableOpacity onPress={toggleLanguage}>
             <View style={[styles.headerButton, darkMode ? styles.btnDark : styles.btnLight]}>
@@ -363,8 +460,6 @@ export default function HomeScreen() {
             </View>
           </TouchableOpacity>
 
-
-
           <TouchableOpacity onPress={() => setModalVisible(true)}>
             <View style={[styles.headerButton, darkMode ? styles.btnDark : styles.btnLight, selectedTags.length > 0 && styles.activeFilterButton]}>
               <Ionicons name="pricetag" size={20} color={selectedTags.length > 0 ? "#fff" : (darkMode ? "#fff" : "#000")} />
@@ -372,7 +467,7 @@ export default function HomeScreen() {
             {selectedTags.length > 0 && <View style={styles.filterBadge} />}
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
 
       <BigHeartOverlay visibleKey={bigHeartTrigger} onFinish={() => { }} />
 
@@ -406,6 +501,16 @@ export default function HomeScreen() {
             const index = Math.round(e.nativeEvent.contentOffset.y / layout.height);
             currentIndexRef.current = index;
           }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={darkMode ? "#fff" : "#000"}
+              title={language === 'zh' ? "刷新中..." : "Refreshing..."}
+              titleColor={darkMode ? "#fff" : "#000"}
+              progressViewOffset={Platform.OS === 'android' ? 120 : 20}
+            />
+          }
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
         />
@@ -472,13 +577,13 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerContainer: { position: 'absolute', top: Platform.OS === 'android' ? 40 : 50, right: 20, zIndex: 10, alignItems: 'flex-end' },
+  headerContainer: { position: 'absolute', top: Platform.OS === 'android' ? 100 : 110, right: 20, zIndex: 10, alignItems: 'flex-end' },
   headerControls: { flexDirection: 'row', gap: 10 },
   headerButton: {
     width: 44,
@@ -568,6 +673,27 @@ const styles = StyleSheet.create({
   },
 
   heartOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 50, pointerEvents: 'none' },
+
+  toastContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 120 : 100, // Below header
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  toastText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
 
   emptyCard: {
     padding: 40,
