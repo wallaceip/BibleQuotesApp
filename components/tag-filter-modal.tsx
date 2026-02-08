@@ -83,6 +83,13 @@ export const TagFilterModal = ({
         });
     };
 
+    // Animated Done (animate first, then apply filters)
+    const handleDoneWithAnimation = () => {
+        translateY.value = withTiming(SCREEN_HEIGHT, { duration: 250 }, () => {
+            runOnJS(onDone)();
+        });
+    };
+
     return (
         <Modal animationType="none" transparent={true} visible={visible} onRequestClose={handleCloseWithAnimation}>
             <GestureHandlerRootView style={{ flex: 1 }}>
@@ -142,7 +149,7 @@ export const TagFilterModal = ({
 
                             <TouchableOpacity
                                 style={[styles.doneButton, { backgroundColor: darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }]}
-                                onPress={onDone}
+                                onPress={handleDoneWithAnimation}
                             >
                                 <Text style={{ color: darkMode ? '#fff' : '#000', fontWeight: '600', fontSize: 16 }}>
                                     {language === 'zh' ? '完成' : 'Done'}
