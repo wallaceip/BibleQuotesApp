@@ -11,7 +11,8 @@ interface TagFilterModalProps {
     getDisplayTag: (tag: string) => string;
     onTagToggle: (tag: string) => void;
     onClearFilters: () => void;
-    onClose: () => void;
+    onDone: () => void;  // Apply filter and refresh list
+    onClose: () => void; // Just close modal (tap outside)
 }
 
 export const TagFilterModal = ({
@@ -23,6 +24,7 @@ export const TagFilterModal = ({
     getDisplayTag,
     onTagToggle,
     onClearFilters,
+    onDone,
     onClose,
 }: TagFilterModalProps) => {
     return (
@@ -77,7 +79,7 @@ export const TagFilterModal = ({
 
                     <TouchableOpacity
                         style={[styles.doneButton, { backgroundColor: darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }]}
-                        onPress={onClose}
+                        onPress={onDone}
                     >
                         <Text style={{ color: darkMode ? '#fff' : '#000', fontWeight: '600', fontSize: 16 }}>
                             {language === 'zh' ? '完成' : 'Done'}

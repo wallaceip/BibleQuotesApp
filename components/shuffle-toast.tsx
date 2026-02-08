@@ -8,13 +8,14 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 
-interface ShuffleToastProps {
+interface ToastProps {
     visible: boolean;
     message: string;
+    icon: 'shuffle' | 'filter' | 'funnel';
     darkMode: boolean;
 }
 
-export const ShuffleToast = ({ visible, message, darkMode }: ShuffleToastProps) => {
+export const Toast = ({ visible, message, icon, darkMode }: ToastProps) => {
     const opacity = useSharedValue(0);
     const translateY = useSharedValue(-20);
 
@@ -41,16 +42,21 @@ export const ShuffleToast = ({ visible, message, darkMode }: ShuffleToastProps) 
             animatedStyle,
             { backgroundColor: darkMode ? 'rgba(50,50,50,0.95)' : 'rgba(255,255,255,0.95)' }
         ]}>
-            <Ionicons name="shuffle" size={18} color={darkMode ? "#fff" : "#000"} style={{ marginRight: 8 }} />
+            <Ionicons name={icon} size={18} color={darkMode ? "#fff" : "#000"} style={{ marginRight: 8 }} />
             <Text style={[styles.toastText, { color: darkMode ? "#fff" : "#000" }]}>{message}</Text>
         </Animated.View>
     );
 };
 
+// Keep old export for backwards compatibility
+export const ShuffleToast = ({ visible, message, darkMode }: { visible: boolean, message: string, darkMode: boolean }) => {
+    return <Toast visible={visible} message={message} icon="shuffle" darkMode={darkMode} />;
+};
+
 const styles = StyleSheet.create({
     toastContainer: {
         position: 'absolute',
-        top: Platform.OS === 'ios' ? 120 : 100,
+        top: Platform.OS === 'ios' ? 70 : 50,
         alignSelf: 'center',
         paddingHorizontal: 20,
         paddingVertical: 10,

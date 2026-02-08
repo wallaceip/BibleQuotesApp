@@ -21,7 +21,7 @@ import {
 
 import { AnimatedSmallHeart, BigHeartOverlay } from '../../components/animated-heart';
 import { HeaderControls } from '../../components/header-controls';
-import { ShuffleToast } from '../../components/shuffle-toast';
+import { Toast } from '../../components/shuffle-toast';
 import { TagFilterModal } from '../../components/tag-filter-modal';
 import { QUOTES_DATA, TAGS, TAG_TRANSLATIONS } from '../../constants/quotes';
 
@@ -36,6 +36,7 @@ export default function HomeScreen() {
   const [language, setLanguage] = useState('en');
   const [refreshing, setRefreshing] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
+  const [toastType, setToastType] = useState<'shuffle' | 'filter'>('shuffle');
 
   const [bigHeartTrigger, setBigHeartTrigger] = useState(0);
   const [smallHeartTriggers, setSmallHeartTriggers] = useState<{ [key: string]: number }>({});
@@ -173,11 +174,12 @@ export default function HomeScreen() {
 
     // Show Toast only if requested
     if (showToastFlag) {
-      showToast();
+      showToast('filter');
     }
   };
 
-  const showToast = () => {
+  const showToast = (type: 'shuffle' | 'filter' = 'shuffle') => {
+    setToastType(type);
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), 2000);
   };
@@ -193,14 +195,14 @@ export default function HomeScreen() {
   };
 
   const handleSingleTagSelect = (tag: string) => {
-    // Just toggle the tag selection for visual highlighting
-    // Don't reshuffle the data - keep current quote stable
+    // If tag is already the only selected tag, deselect it (visual only)
     if (selectedTags.includes(tag) && selectedTags.length === 1) {
-      setSelectedTags([]); // Toggle off
+      setSelectedTags([]);
     } else {
+      // Select this tag and open filter modal for confirmation
       setSelectedTags([tag]);
+      setModalVisible(true);
     }
-    // Note: Filtering happens via filteredSource memo, but we don't reshuffle displayData here
   };
 
   const clearFilters = () => {
@@ -360,7 +362,15 @@ export default function HomeScreen() {
       <StatusBar barStyle={darkMode ? "light-content" : "dark-content"} />
 
       {/* Toast Notification */}
-      <ShuffleToast visible={toastVisible} message={language === 'zh' ? "列表已刷新" : "List Shuffled"} darkMode={darkMode} />
+      <Toast
+        visible={toastVisible}
+        message={toastType === 'filter'
+          ? (language === 'zh' ? "已套用篩選" : "Filters Applied")
+          : (language === 'zh' ? "已刷新" : "Shuffled")
+        }
+        icon={toastType === 'filter' ? 'funnel' : 'shuffle'}
+        darkMode={darkMode}
+      />
 
       {/* Header */}
       <HeaderControls
@@ -429,6 +439,10 @@ export default function HomeScreen() {
         getDisplayTag={getDisplayTag}
         onTagToggle={handleTagToggle}
         onClearFilters={clearFilters}
+        onDone={() => {
+          applyFilterWithPreservation(selectedTags, true);
+          setModalVisible(false);
+        }}
         onClose={() => setModalVisible(false)}
       />
     </SafeAreaView>
