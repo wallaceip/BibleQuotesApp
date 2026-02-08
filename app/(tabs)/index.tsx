@@ -185,13 +185,13 @@ export default function HomeScreen() {
   };
 
   const handleTagToggle = (tag: string) => {
-    let newTags: string[];
+    // Only update selectedTags for visual state in modal
+    // Data refresh happens only when Done is pressed
     if (selectedTags.includes(tag)) {
-      newTags = selectedTags.filter(t => t !== tag);
+      setSelectedTags(selectedTags.filter(t => t !== tag));
     } else {
-      newTags = [...selectedTags, tag];
+      setSelectedTags([...selectedTags, tag]);
     }
-    applyFilterWithPreservation(newTags, false); // No toast
   };
 
   const handleSingleTagSelect = (tag: string) => {
@@ -206,7 +206,9 @@ export default function HomeScreen() {
   };
 
   const clearFilters = () => {
-    applyFilterWithPreservation([], false); // No toast
+    // Only clear selectedTags for visual state in modal
+    // Data refresh happens only when Done is pressed
+    setSelectedTags([]);
   };
 
   // Pull to Refresh
