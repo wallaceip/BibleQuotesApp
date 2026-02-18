@@ -12,15 +12,15 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: isDark ? '#1c1c1e' : '#ffffff', // Solid background
+          backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
           borderTopWidth: 1,
           borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
           height: Platform.OS === 'ios' ? 88 : 70,
           paddingBottom: Platform.OS === 'ios' ? 28 : 10,
           paddingTop: 10,
         },
-        tabBarActiveTintColor: '#007AFF', // iOS Active Blue
-        tabBarInactiveTintColor: isDark ? '#8e8e93' : '#8e8e93', // iOS Gray
+        tabBarActiveTintColor: '#007AFF',
+        tabBarInactiveTintColor: isDark ? '#8e8e93' : '#8e8e93',
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '500',
@@ -46,6 +46,17 @@ export default function TabLayout() {
           title: 'Favorites',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'heart' : 'heart-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+
+      {/* History Tab */}
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'time' : 'time-outline'} size={24} color={color} />
           ),
         }}
       />
