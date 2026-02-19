@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GlassView } from 'expo-glass-effect';
 import { useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useRef, useState } from 'react';
@@ -21,6 +22,7 @@ import {
 } from 'react-native';
 
 import { AnimatedSmallHeart, BigHeartOverlay } from '../../components/animated-heart';
+import { FilterModal } from '../../components/filter-modal';
 import { HeaderControls } from '../../components/header-controls';
 import { Toast } from '../../components/shuffle-toast';
 import { fetchRandomBatch, getBibleGatewayUrl, Quote, refreshPool } from '../../services/quotes-service';
@@ -30,7 +32,6 @@ const initialHeight = Dimensions.get('window').height;
 
 export default function HomeScreen() {
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [language, setLanguage] = useState('en');
   const [refreshing, setRefreshing] = useState(false);
@@ -48,6 +49,10 @@ export default function HomeScreen() {
   const listRef = useRef<FlatList>(null);
   const hasLoadedRef = useRef(false);
 
+  // Filter
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+
   useFocusEffect(
     useCallback(() => {
       loadSettings();
@@ -64,7 +69,6 @@ export default function HomeScreen() {
       if (storedTheme !== null) setDarkMode(JSON.parse(storedTheme));
       if (storedLang) setLanguage(storedLang);
 
-      // Fetch initial batch (once per app session)
       if (!hasLoadedRef.current) {
         hasLoadedRef.current = true;
         await loadInitialQuotes();
@@ -104,7 +108,6 @@ export default function HomeScreen() {
     await AsyncStorage.setItem('favorites', JSON.stringify(newFavs));
   };
 
-  /** Save a favorited quote's full data to AsyncStorage */
   const saveFavoriteQuoteData = async (quote: Quote) => {
     try {
       const stored = await AsyncStorage.getItem('savedFavoriteQuotes');
@@ -118,7 +121,6 @@ export default function HomeScreen() {
     }
   };
 
-  /** Remove a quote from the saved favorites data */
   const removeFavoriteQuoteData = async (quoteId: string) => {
     try {
       const stored = await AsyncStorage.getItem('savedFavoriteQuotes');
@@ -132,17 +134,14 @@ export default function HomeScreen() {
     }
   };
 
-  // Save viewed quote to history
+  // -- History --
   const saveToHistory = async (quote: Quote) => {
     try {
       const stored = await AsyncStorage.getItem('history');
       const history: Quote[] = stored ? JSON.parse(stored) : [];
-      // Don't add duplicates that were just viewed
       if (history.length > 0 && history[0].id === quote.id) return;
-      // Add the full quote + timestamp
       const entry = { ...quote, viewedAt: Date.now() };
       history.unshift(entry);
-      // Keep max 200 history items
       if (history.length > 200) history.splice(200);
       await AsyncStorage.setItem('history', JSON.stringify(history));
     } catch (e) {
@@ -150,26 +149,19 @@ export default function HomeScreen() {
     }
   };
 
+  // -- Toast --
   const showToast = (msg?: string) => {
     setToastMessage(msg || '');
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), 2000);
   };
 
-  const toggleFavoritesFilter = () => {
-    const newVal = !showFavoritesOnly;
-    setShowFavoritesOnly(newVal);
-    showToast(newVal
-      ? (language === 'zh' ? '顯示收藏' : 'Showing Favorites')
-      : (language === 'zh' ? '顯示全部' : 'Showing All'));
-  };
-
-  // Filtered data for display
-  const filteredData = showFavoritesOnly
+  // -- Filtering --
+  const filteredData = selectedFilter === 'favorites'
     ? displayData.filter(q => favorites.includes(q.id))
     : displayData;
 
-  // Pull to Refresh — re-fetch from online + reshuffle
+  // -- Refresh --
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     refreshPool()
@@ -183,7 +175,6 @@ export default function HomeScreen() {
       .finally(() => setRefreshing(false));
   }, []);
 
-  // Load more quotes when scrolling near the end
   const loadMore = async () => {
     if (isFetchingMore) return;
     setIsFetchingMore(true);
@@ -258,10 +249,10 @@ export default function HomeScreen() {
       <TouchableWithoutFeedback onPress={handleTapEvents}>
         <View style={[styles.pageContainer, { backgroundColor: darkMode ? '#000' : '#f0f0f5', width: layout.width, height: layout.height }]}>
           <View style={styles.centerContent}>
-            <View style={[styles.quoteCard, darkMode ? styles.cardDark : styles.cardLight]}>
+            <GlassView style={[styles.quoteCard, darkMode ? styles.cardDark : styles.cardLight]} glassEffectStyle="regular">
               <Text style={[styles.quoteText, { color: darkMode ? '#fff' : '#000' }]}>{displayText}</Text>
               <Text style={[styles.verseText, { color: darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)' }]}>{displayVerse}</Text>
-            </View>
+            </GlassView>
 
             <View style={styles.bottomActions}>
               <TouchableOpacity onPress={() => onShare(displayText, displayVerse)} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
@@ -278,7 +269,7 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
-      </TouchableWithoutFeedback>
+      </TouchableWithoutFeedback >
     );
   };
 
@@ -289,30 +280,45 @@ export default function HomeScreen() {
       <Toast
         visible={toastVisible}
         message={toastMessage || (language === 'zh' ? "已刷新" : "Refreshed")}
-        icon={showFavoritesOnly ? 'funnel' : 'shuffle'}
+        icon={selectedFilter ? 'funnel' : 'shuffle'}
         darkMode={darkMode}
       />
 
       <HeaderControls
         language={language}
         darkMode={darkMode}
-        selectedTagsCount={showFavoritesOnly ? 1 : 0}
+        selectedTagsCount={selectedFilter ? 1 : 0}
         onToggleLanguage={toggleLanguage}
         onToggleTheme={toggleTheme}
-        onOpenFilter={toggleFavoritesFilter}
+        onOpenFilter={() => setFilterModalVisible(true)}
       />
 
       <BigHeartOverlay visibleKey={bigHeartTrigger} onFinish={() => { }} />
 
+      {/* Filter Modal */}
+      <FilterModal
+        visible={filterModalVisible}
+        darkMode={darkMode}
+        language={language}
+        selectedFilter={selectedFilter}
+        onSelectFilter={(f) => {
+          setSelectedFilter(f);
+          if (f === 'favorites') {
+            showToast(language === 'zh' ? '篩選：收藏' : 'Filter: Favorites');
+          }
+        }}
+        onClose={() => setFilterModalVisible(false)}
+      />
+
       {isLoading && displayData.length === 0 ? (
-        <View style={[styles.pageContainer, { width: layout.width, height: layout.height }]}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={darkMode ? '#fff' : '#007AFF'} />
           <Text style={{ color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)', marginTop: 16, fontSize: 16 }}>
             {language === 'zh' ? '正在獲取經文...' : 'Fetching verses...'}
           </Text>
         </View>
       ) : displayData.length === 0 ? (
-        <View style={[styles.pageContainer, { width: layout.width, height: layout.height }]}>
+        <View style={styles.loadingContainer}>
           <View style={[styles.emptyCard, darkMode ? styles.cardDark : styles.cardLight]}>
             <Ionicons name="cloud-offline-outline" size={48} color={darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} />
             <Text style={{ color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)', marginTop: 16, fontSize: 16, textAlign: 'center' }}>
@@ -337,7 +343,7 @@ export default function HomeScreen() {
           decelerationRate="fast"
           snapToInterval={layout.height}
           disableIntervalMomentum={true}
-          getItemLayout={(data, index) => ({ length: layout.height, offset: layout.height * index, index })}
+          getItemLayout={(_data, index) => ({ length: layout.height, offset: layout.height * index, index })}
           onMomentumScrollEnd={(e) => {
             const index = Math.round(e.nativeEvent.contentOffset.y / layout.height);
             currentIndexRef.current = index;
@@ -373,12 +379,14 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   pageContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, width: '100%' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   quoteCard: {
     padding: 32,
     borderRadius: 24,
     width: '100%',
     maxWidth: 380,
+    overflow: 'hidden',
   },
   cardDark: {
     backgroundColor: '#1c1c1e',
@@ -412,3 +420,4 @@ const styles = StyleSheet.create({
     padding: 12,
   },
 });
+

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GlassView } from 'expo-glass-effect';
 import { useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useState } from 'react';
@@ -150,16 +151,16 @@ export default function HistoryScreen() {
 
                 <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
                     {history.length === 0 ? (
-                        <View style={[styles.emptyContainer, darkMode ? styles.cardDark : styles.cardLight]}>
+                        <GlassView style={[styles.emptyContainer, darkMode ? styles.cardDark : styles.cardLight]} glassEffectStyle="regular">
                             <Ionicons name="time-outline" size={60} color={theme.subText} />
                             <Text style={{ color: theme.subText, marginTop: 20, fontSize: 18, fontWeight: '500' }}>{labels.noHistory}</Text>
                             <Text style={{ color: theme.subText, marginTop: 8, fontSize: 14, textAlign: 'center' }}>{labels.hint}</Text>
-                        </View>
+                        </GlassView>
                     ) : (
                         history.map((entry) => {
                             const isFav = favorites.includes(entry.id);
                             return (
-                                <View key={`${entry.id}-${entry.viewedAt}`} style={[styles.historyCard, darkMode ? styles.cardDark : styles.cardLight]}>
+                                <GlassView key={`${entry.id}-${entry.viewedAt}`} style={[styles.historyCard, darkMode ? styles.cardDark : styles.cardLight]} glassEffectStyle="regular">
                                     <Text style={[styles.historyText, { color: theme.text }]}>
                                         {language === 'zh' ? entry.text_zh : entry.text}
                                     </Text>
@@ -188,7 +189,7 @@ export default function HistoryScreen() {
                                             </TouchableOpacity>
                                         </View>
                                     </View>
-                                </View>
+                                </GlassView>
                             );
                         })
                     )}

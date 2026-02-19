@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { GlassView } from 'expo-glass-effect';
 import React, { useEffect } from 'react';
 import { Platform, StyleSheet, Text } from 'react-native';
 import Animated, {
@@ -40,10 +41,11 @@ export const Toast = ({ visible, message, icon, darkMode }: ToastProps) => {
         <Animated.View style={[
             styles.toastContainer,
             animatedStyle,
-            { backgroundColor: darkMode ? 'rgba(50,50,50,0.95)' : 'rgba(255,255,255,0.95)' }
         ]}>
-            <Ionicons name={icon} size={18} color={darkMode ? "#fff" : "#000"} style={{ marginRight: 8 }} />
-            <Text style={[styles.toastText, { color: darkMode ? "#fff" : "#000" }]}>{message}</Text>
+            <GlassView style={[styles.toastInner, { backgroundColor: darkMode ? 'rgba(50,50,50,0.95)' : 'rgba(255,255,255,0.95)' }]} glassEffectStyle="regular">
+                <Ionicons name={icon} size={18} color={darkMode ? "#fff" : "#000"} style={{ marginRight: 8 }} />
+                <Text style={[styles.toastText, { color: darkMode ? "#fff" : "#000" }]}>{message}</Text>
+            </GlassView>
         </Animated.View>
     );
 };
@@ -58,12 +60,15 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: Platform.OS === 'ios' ? 70 : 50,
         alignSelf: 'center',
+        zIndex: 999,
+    },
+    toastInner: {
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderRadius: 25,
         flexDirection: 'row',
         alignItems: 'center',
-        zIndex: 999,
+        overflow: 'hidden',
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GlassView } from 'expo-glass-effect';
 import { useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useState } from 'react';
@@ -80,14 +81,14 @@ export default function FavoritesScreen() {
 
                 <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
                     {favoriteQuotes.length === 0 ? (
-                        <View style={[styles.emptyContainer, darkMode ? styles.cardDark : styles.cardLight]}>
+                        <GlassView style={[styles.emptyContainer, darkMode ? styles.cardDark : styles.cardLight]} glassEffectStyle="regular">
                             <Ionicons name="heart-outline" size={60} color={theme.subText} />
                             <Text style={{ color: theme.subText, marginTop: 20, fontSize: 18, fontWeight: '500' }}>{labels.noFavorites}</Text>
                             <Text style={{ color: theme.subText, marginTop: 8, fontSize: 14, textAlign: 'center' }}>{labels.hint}</Text>
-                        </View>
+                        </GlassView>
                     ) : (
                         favoriteQuotes.map((item) => (
-                            <View key={item.id} style={[styles.favCard, darkMode ? styles.cardDark : styles.cardLight]}>
+                            <GlassView key={item.id} style={[styles.favCard, darkMode ? styles.cardDark : styles.cardLight]} glassEffectStyle="regular">
                                 <Text style={[styles.favText, { color: theme.text }]}>
                                     {language === 'zh' ? item.text_zh : item.text}
                                 </Text>
@@ -107,7 +108,7 @@ export default function FavoritesScreen() {
                                         </TouchableOpacity>
                                     </View>
                                 </View>
-                            </View>
+                            </GlassView>
                         ))
                     )}
                 </ScrollView>

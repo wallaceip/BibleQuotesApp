@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { GlassView } from 'expo-glass-effect';
 import React, { useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
@@ -55,25 +56,25 @@ export const HeaderControls = ({
             {/* Options Button - Top Right */}
             <View style={styles.optionsContainer}>
                 <TouchableOpacity onPress={toggleOptions}>
-                    <View style={[styles.controlButton, darkMode ? styles.btnDark : styles.btnLight]}>
+                    <GlassView style={[styles.controlButton, darkMode ? styles.btnDark : styles.btnLight]} glassEffectStyle="clear">
                         <Ionicons name={optionsExpanded ? "close" : "menu"} size={22} color={darkMode ? "#fff" : "#000"} />
-                    </View>
+                    </GlassView>
                 </TouchableOpacity>
 
                 {/* Expanded Options - Slide down vertically */}
                 <Animated.View style={[styles.expandedOptions, animatedOptionsStyle]}>
                     <TouchableOpacity onPress={onToggleLanguage}>
-                        <View style={[styles.controlButton, darkMode ? styles.btnDark : styles.btnLight]}>
+                        <GlassView style={[styles.controlButton, darkMode ? styles.btnDark : styles.btnLight]} glassEffectStyle="clear">
                             <Text style={{ color: darkMode ? "#fff" : "#000", fontSize: 13, fontWeight: '700' }}>
                                 {language === 'en' ? '中' : 'EN'}
                             </Text>
-                        </View>
+                        </GlassView>
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={onToggleTheme}>
-                        <View style={[styles.controlButton, darkMode ? styles.btnDark : styles.btnLight]}>
+                        <GlassView style={[styles.controlButton, darkMode ? styles.btnDark : styles.btnLight]} glassEffectStyle="clear">
                             <Ionicons name={darkMode ? "sunny" : "moon"} size={20} color={darkMode ? "#fff" : "#000"} />
-                        </View>
+                        </GlassView>
                     </TouchableOpacity>
                 </Animated.View>
             </View>
@@ -81,9 +82,9 @@ export const HeaderControls = ({
             {/* Filter Button - Bottom Right, just above tab bar */}
             <View style={styles.filterContainer}>
                 <TouchableOpacity onPress={onOpenFilter}>
-                    <View style={[styles.controlButton, styles.filterButton, darkMode ? styles.btnDark : styles.btnLight, selectedTagsCount > 0 && styles.activeFilterButton]}>
+                    <GlassView style={[styles.controlButton, styles.filterButton, darkMode ? styles.btnDark : styles.btnLight, selectedTagsCount > 0 && styles.activeFilterButton]} glassEffectStyle="clear">
                         <Ionicons name="funnel" size={22} color={selectedTagsCount > 0 ? "#fff" : (darkMode ? "#fff" : "#000")} />
-                    </View>
+                    </GlassView>
                     {selectedTagsCount > 0 && <View style={styles.filterBadge} />}
                 </TouchableOpacity>
             </View>
